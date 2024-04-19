@@ -1,0 +1,5 @@
+uvicorn
+fastapi[all]
+pydantic
+transformers
+xformers
