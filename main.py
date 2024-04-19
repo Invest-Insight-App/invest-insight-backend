@@ -61,7 +61,7 @@ async def classify_text(articles):
             results.append({"article_sentiment_analysis": pipe(article['title']), "article_name": article['title'], "article_description": article['description'], "article_url": article['url']})
     return results;
 
-@app.post("/investmentAnalysis/v1/sentimentAnalysis", response_model=SentimentAnalysisResponses, status_code=status.HTTP_200_OK, tags=[Tags.investmentInsight], summary="sentiment analysis on news articles")
+@app.get("/investmentAnalysis/v1/sentimentAnalysis", response_model=SentimentAnalysisResponses, status_code=status.HTTP_200_OK, tags=[Tags.investmentInsight], summary="sentiment analysis on news articles")
 async def classify(company_name: str, start_date: datetime.date):
     api_key = API_KEY
 
