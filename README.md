@@ -7,33 +7,33 @@ For detailed documentation on FastAPI, visit: [FastAPI Documentation](https://fa
 
 1. Create the virtual environment file:
 
-python3.8 -m venv env
+`python3.8 -m venv env`
 
 2. Activate the virtual environment:
 
-source env/bin/activate
+`source env/bin/activate`
 
 3. Verify that the new environment is working:
 
-pip freeze
+`pip freeze`
 
 3. Install packages:
 
-pip install -r requirements.txt
+`pip install -r requirements.txt`
 
 ## Option 2: Setting Up Environment (Conda)
 
 1. Create the Conda environment from the provided `environment.yml` file:
 
-conda env create -f environment.yml
+`conda env create -f environment.yml`
 
 2. Activate the newly created environment:
 
-conda activate myenv
+`conda activate myenv`
 
 3. Verify that the new environment was installed correctly:
 
-conda env list
+`conda env list`
 
 For more information on managing Conda environments, refer to the [Conda User Guide](https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html).
 
@@ -41,7 +41,7 @@ For more information on managing Conda environments, refer to the [Conda User Gu
 
 To start the FastAPI local server, use the following command (run from the root directory of your project):
 
-uvicorn main:app --reload
+`uvicorn main:app --reload`
 
 Visit [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) in your browser to access the Swagger API documentation.
 
