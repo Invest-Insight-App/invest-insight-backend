@@ -40,10 +40,9 @@ class SentimentAnalysisScores(BaseModel):
     label: str
     score: float
 
-#added this in - TB
 class TextSummary(BaseModel):
     #article_name: str
-    article_summary: str # added this in - TB
+    article_summary: str 
     combined_text: str
     #article_url: str
 
@@ -52,7 +51,7 @@ class ArticleResponses(BaseModel):
     article_name: str
     article_description: str
     article_url: str
-    article_snippet: str # added this in - TB
+    article_snippet: str 
 
 class SentimentAnalysisResponses(BaseModel):
     responses: List[ArticleResponses]
@@ -74,12 +73,10 @@ async def classify_text(data):
                             "article_name": d['title'],
                             "article_description": d['description'], 
                             "article_url": d['url'],
-                            "article_snippet": d['snippet'] # added this in - TB
-                           # "article_highlight": d['highlight']
+                            "article_snippet": d['snippet'] 
                             })
     return results;
 
-### added this in - TB
 # summarization function
 
 async def summarize_text(data):
