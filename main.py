@@ -64,6 +64,7 @@ async def classify_text(articles):
 @app.get("/investmentAnalysis/v1/sentimentAnalysis", response_model=SentimentAnalysisResponses, status_code=status.HTTP_200_OK, tags=[Tags.investmentInsight], summary="sentiment analysis on news articles")
 async def classify(company_name: str, start_date: datetime.date):
     api_key = API_KEY
+    print("api_key", api_key)
 
     if api_key:
         api_key = api_key.strip("()").strip("' ")
@@ -73,14 +74,14 @@ async def classify(company_name: str, start_date: datetime.date):
     try:
         # articles = DUMMY_DATA["data"]["articles"]
         articles = requests.get(f'https://newsapi.org/v2/everything?q={company_name}&from={start_date}&sortBy=popularity&apiKey={api_key}')
-        if articles.status_code != 200:
-            raise HTTPException(status_code=articles.status_code, detail="Failed to fetch news articles")
-
-        responses = articles.json()[ 'articles']
-        results = await classify_text(responses)
-        return {"responses": results, "totalResults": len(results), "status": "ok"}
-
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Internal server error") from e
+        raise HTTPException(status_code=articles.status_code) from e
+
+    if articles.status_code != 200:
+        raise HTTPException(status_code=articles.status_code, detail="Failed to fetch news articles")
+
+    responses = articles.json()[ 'articles']
+    results = await classify_text(responses)
+    return {"responses": results, "totalResults": len(results), "status": "ok"}
 
 
