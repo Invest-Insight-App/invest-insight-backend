@@ -2,11 +2,11 @@ import datetime
 from typing import List
 from fastapi import FastAPI
 from pydantic import BaseModel
-from transformers import pipeline
+from transformers import pipeline , AutoTokenizer, AutoModelForSeq2SeqLM, BartForConditionalGeneration #- Added in TB
 import requests
 import os
 from dotenv import load_dotenv
-from data import DUMMY_DATA
+from data import DUMMY_DATA  # data taken from stockdata API
 from fastapi import FastAPI, HTTPException, status, Request
 import time
 from fastapi.middleware.cors import CORSMiddleware
@@ -40,29 +40,81 @@ class SentimentAnalysisScores(BaseModel):
     label: str
     score: float
 
+#added this in - TB
+class TextSummary(BaseModel):
+    #article_name: str
+    article_summary: str # added this in - TB
+    combined_text: str
+    #article_url: str
+
 class ArticleResponses(BaseModel):
     article_sentiment_analysis: List[SentimentAnalysisScores]
     article_name: str
     article_description: str
     article_url: str
+    article_snippet: str # added this in - TB
 
 class SentimentAnalysisResponses(BaseModel):
     responses: List[ArticleResponses]
+    summary: List[TextSummary]
 
 class Tags(Enum):
     investmentInsight = "Investment Analysis"
 
-async def classify_text(articles):
+
+
+# text classification function
+async def classify_text(data):
     pipe = pipeline("text-classification", model="mrm8488/distilroberta-finetuned-financial-news-sentiment-analysis")
     results = []
-    for article in articles:
-        print("article", article['title'])
-        if article['title'] != '[Removed]':
-            results.append({"article_sentiment_analysis": pipe(article['title']), "article_name": article['title'], "article_description": article['description'], "article_url": article['url']})
+    for d in data[:2]:
+        print("article", d['title'])
+        if d['title'] != 'null':
+            results.append({"article_sentiment_analysis": pipe(d['title']), 
+                            "article_name": d['title'],
+                            "article_description": d['description'], 
+                            "article_url": d['url'],
+                            "article_snippet": d['snippet'] # added this in - TB
+                           # "article_highlight": d['highlight']
+                            })
     return results;
 
+### added this in - TB
+# summarization function
+
+async def summarize_text(data):
+    """ Summarizes the news article 'highlight' within the data < entity list from the api"""
+    sum_pipe = pipeline("summarization", model="facebook/bart-large-cnn")
+    results = []
+    for d in data:
+             # Check if the item contains entities
+        if "entities" in d:
+            entities = d["entities"]
+            
+            # Iterate over each entity
+        for entity in entities:
+            # Check if the entity contains highlights
+            if "highlights" in entity:
+                highlights = entity["highlights"]
+                    
+             # Iterate over each article highlight
+            for highlight in highlights:
+                # Check if the highlight contains text
+                if "highlight" in highlight:
+                    # text = highlight["highlight"] - if not using combined text
+                    # Combine snippet and highlight
+                    text = d.get("snippet", "") + " " + highlight["highlight"]
+                            
+                    # Summarize the highlight using BART
+                    summary = sum_pipe(text, max_length=80, min_length=30, do_sample=False, num_beams=2)[0]["summary_text"]
+                                
+                    # Append the summary to the list
+                    results.append({"combined_text": text, "article_summary": summary })
+    return results;
+
+# API endpoint for sentiment analysis and text summarization
 @app.get("/investmentAnalysis/v1/sentimentAnalysis", response_model=SentimentAnalysisResponses, status_code=status.HTTP_200_OK, tags=[Tags.investmentInsight], summary="sentiment analysis on news articles")
-async def classify(company_name: str, start_date: datetime.date):
+async def classify(symbol: str, start_date: datetime.date):
     api_key = API_KEY
     print("api_key", api_key)
 
@@ -72,16 +124,14 @@ async def classify(company_name: str, start_date: datetime.date):
         raise HTTPException(status_code=404, detail="Internal server error")
 
     try:
-        # articles = DUMMY_DATA["data"]["articles"]
-        articles = requests.get(f'https://newsapi.org/v2/everything?q={company_name}&from={start_date}&sortBy=popularity&apiKey={api_key}')
+        data = requests.get(f' https://api.stockdata.org/v1/news/all?symbols={symbol}&filter_entities=true&published_before={start_date}&language=en&api_token={api_key}')
     except Exception as e:
-        raise HTTPException(status_code=articles.status_code) from e
+        raise HTTPException(status_code=data.status_code) from e
 
-    if articles.status_code != 200:
-        raise HTTPException(status_code=articles.status_code, detail="Failed to fetch news articles")
+    if data.status_code != 200:
+        raise HTTPException(status_code=data.status_code, detail="Failed to fetch news articles")
 
-    responses = articles.json()[ 'articles']
+    responses = data.json()[ 'data']
     results = await classify_text(responses)
-    return {"responses": results, "totalResults": len(results), "status": "ok"}
-
-
+    summary = await summarize_text(responses)
+    return {"responses": results, "totalResults": len(results), "status": "ok", "summary": summary}
