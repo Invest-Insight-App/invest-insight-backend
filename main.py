@@ -2,11 +2,13 @@ import datetime
 from typing import List
 import pandas as pd
 from pydantic import BaseModel
-from transformers import pipeline
 import requests
 import os
 from dotenv import load_dotenv
+
 from fastapi import FastAPI, HTTPException, status, Request, Depends
+from data import DUMMY_DATA  # data taken from stockdata API
+
 import time
 from fastapi.middleware.cors import CORSMiddleware
 from enum import Enum
@@ -18,7 +20,7 @@ import utils
 import schemas
 
 load_dotenv()
-API_KEY=os.environ.get("NEWS_API_KEY")
+API_KEY=os.environ.get("STOCK_DATA_API_KEY")
 SEC_API_KEY=os.environ.get("SEC_API_KEY")
 
 # Dependency
@@ -50,8 +52,9 @@ class Tags(Enum):
     investmentInsight = "Investment Analysis"
     exchange = "Companies data"
 
-@app.get("/investmentAnalysis/v1/sentimentAnalysis", response_model=schemas.SentimentAnalysisResponses, status_code=status.HTTP_200_OK, tags=[Tags.investmentInsight], summary="sentiment analysis on news articles")
-async def classify(company_name: str, start_date: datetime.date):
+# API endpoint for sentiment analysis and text summarization
+@app.get("/investmentAnalysis/v1/sentimentAnalysis", response_model=schemas.SentimentAnalysisResponses, status_code=status.HTTP_200_OK, tags=[Tags.investmentInsight], summary="Sentiment Analysis On News Articles")
+async def classify(symbol: str, start_date: datetime.date):
     api_key = API_KEY
 
     if api_key:
@@ -60,49 +63,17 @@ async def classify(company_name: str, start_date: datetime.date):
         raise HTTPException(status_code=404, detail="Internal server error")
 
     try:
-        # articles = DUMMY_DATA["data"]["articles"]
-        articles = requests.get(f'https://newsapi.org/v2/everything?q={company_name}&from={start_date}&sortBy=popularity&apiKey={api_key}')
+        data = requests.get(f' https://api.stockdata.org/v1/news/all?symbols={symbol}&filter_entities=true&published_before={start_date}&language=en&api_token={api_key}')
     except Exception as e:
-        raise HTTPException(status_code=articles.status_code) from e
+        raise HTTPException(status_code=data.status_code) from e
 
-    if articles.status_code != 200:
-        raise HTTPException(status_code=articles.status_code, detail="Failed to fetch news articles")
+    if data.status_code != 200:
+        raise HTTPException(status_code=data.status_code, detail="Failed to fetch news articles")
 
-    responses = articles.json()[ 'articles']
+    responses = data.json()[ 'data']
     results = await utils.classify_text(responses)
-    return {"responses": results, "totalResults": len(results), "status": "ok"}
-
-@app.get("/InvestmentAnalysis/v2/SentimentAnalysis", response_model=schemas.SentimentAnalysisResponses, status_code=status.HTTP_200_OK, tags=[Tags.investmentInsight], summary="Sentiment Analysis On News Articles")
-async def classify(company_name: str, start_date: datetime.date):
-    """
-    Create CSV files for listed companies.
-
-    Args:
-        exchange (str): The exchange for which the companies are listed.
-            Must be one of: NYSE, NASDAQ, NYSEMKT, NYSEARCA, OTC, BATS, INDEX
-
-    Returns:
-        dict: A message indicating the operation is done.
-    """
-    api_key = API_KEY
-
-    if api_key:
-        api_key = api_key.strip("()").strip("' ")
-    else:
-        raise HTTPException(status_code=404, detail="Internal server error")
-
-    try:
-        # articles = DUMMY_DATA["data"]["articles"]
-        articles = requests.get(f'https://newsapi.org/v2/everything?q={company_name}&from={start_date}&sortBy=popularity&apiKey={api_key}')
-    except Exception as e:
-        raise HTTPException(status_code=articles.status_code) from e
-
-    if articles.status_code != 200:
-        raise HTTPException(status_code=articles.status_code, detail="Failed to fetch news articles")
-
-    responses = articles.json()[ 'articles']
-    results = await utils.classify_text(responses)
-    return {"responses": results, "totalResults": len(results), "status": "ok"}
+    summary = await utils.summarize_text(responses)
+    return {"responses": results, "totalResults": len(results), "status": "ok", "summary": summary}
 
 @app.post("/Exchange/v1/CompaniesCsv", response_model=[], status_code=status.HTTP_200_OK, tags=[Tags.exchange])
 async def create_csv_files_for_listed_companies(exchange: str):
@@ -154,3 +125,4 @@ def read_companies(exchange: str, page: int = 1, limit: int = 100, db: Session =
     if not db_companies:
         raise HTTPException(status_code=404, detail="No companies found for the specified exchange.")
     return db_companies
+
