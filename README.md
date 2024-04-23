@@ -74,7 +74,7 @@ To set up the MySQL database, follow these steps:
 
 `DB_PASSWORD=your_database_password`
 
-5. Start Server and Run Endpoint: Start your server and run the endpoint that updates the database with exchange data from CSV files
+5. **Start Server and Run Endpoint**: Start your server and run the endpoint that updates the database with exchange data from CSV files
 
 ![API endpoint to create companies](images/create_companies.png)
 
