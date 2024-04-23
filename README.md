@@ -51,7 +51,7 @@ Visit [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) in your browser t
 
 If your application requires an API key from [News API](https://newsapi.org/), make sure to add it in the `.env` file. Replace placeholder with your api key
 
-`export NEWS_API_KEY="placeholder"`
+` API_KEY=placeholder`
 
 ## Start Testing!
 
