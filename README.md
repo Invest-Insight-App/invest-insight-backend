@@ -45,7 +45,7 @@ To start the FastAPI local server, use the following command (run from the root 
 
 Visit [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) in your browser to access the Swagger API documentation.
 
-![Swagger API Documentation](investment_insight_api.png)
+![Swagger API Documentation](images/investment_insight_api.png)
 
 ### Adding API Key in `.env`
 
