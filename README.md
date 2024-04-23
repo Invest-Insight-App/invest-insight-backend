@@ -1,4 +1,4 @@
-# FastAPI Backend Project
+# Investment Buddy Backend Project
 
 This backend is built using the FastAPI framework.
 For detailed documentation on FastAPI, visit: [FastAPI Documentation](https://fastapi.tiangolo.com/)
