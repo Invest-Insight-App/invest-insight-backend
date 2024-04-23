@@ -1,0 +1,6 @@
+name,ticker,cik,cusip,exchange,isDelisted,category,sector,industry,sic,sicSector,sicIndustry,famaSector,famaIndustry,currency,location,id
+DOW JONES INDUSTRIAL AVERAGE,^DJI,,,INDEX,False,IDX,,,,,,,,USD,,ff6b00800c81be02a754514594b353c9
+S&P 500,^GSPC,,,INDEX,False,IDX,,,,,,,,USD,,1fa9111134dd0b2320961fcc74acb275
+NASDAQ COMPOSITE,^IXIC,,,INDEX,False,IDX,,,,,,,,USD,,485f6b7afca4edfc759213c2cca86908
+RUSSELL 2000,^RUT,,,INDEX,False,IDX,,,,,,,,USD,,1e1a07a15f74b5426cc18d1343f8ea8a
+CBOE VOLATILITY INDEX,^VIX,,,INDEX,False,IDX,,,,,,,,USD,,24a586014f1fc8e3e433f0a474e1723c
