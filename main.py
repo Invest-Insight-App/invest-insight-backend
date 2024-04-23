@@ -50,11 +50,20 @@ app.add_middleware(
 
 class Tags(Enum):
     investmentInsight = "Investment Analysis"
-    exchange = "Companies data"
+    exchange = "Exchange Market"
 
 # API endpoint for sentiment analysis and text summarization
 @app.get("/investmentAnalysis/v1/sentimentAnalysis", response_model=schemas.SentimentAnalysisResponses, status_code=status.HTTP_200_OK, tags=[Tags.investmentInsight], summary="Sentiment Analysis On News Articles")
 async def classify(symbol: str, start_date: datetime.date):
+    """
+    Fetches AI sentiment analysis and summaries of news articles.
+
+    Args:
+
+    symbol (str): The symbol representing the ticker.
+
+    start_date (str): The start date in the format YYYY-MM-DD.
+    """
     api_key = API_KEY
 
     if api_key:
@@ -75,29 +84,36 @@ async def classify(symbol: str, start_date: datetime.date):
     summary = await utils.summarize_text(responses)
     return {"responses": results, "totalResults": len(results), "status": "ok", "summary": summary}
 
-@app.post("/Exchange/v1/CompaniesCsv", response_model=[], status_code=status.HTTP_200_OK, tags=[Tags.exchange])
-async def create_csv_files_for_listed_companies(exchange: str):
-    """
-    Create CSV files for listed companies.
+# @app.post("/ExchangeMarket/v1/CompaniesCsv", response_model=[], status_code=status.HTTP_200_OK, tags=[Tags.exchange])
+# async def create_csv_files_for_listed_companies(exchange: str):
+#     """
+#     Create CSV files for listed companies.
 
-    Args:
-        exchange (str): The exchange for which the companies are listed.
-            Must be one of: NYSE, NASDAQ, NYSEMKT, NYSEARCA, OTC, BATS, INDEX
+#     Args:
+#         exchange (str): The exchange for which the companies are listed.
+#             Must be one of: NYSE, NASDAQ, NYSEMKT, NYSEARCA, OTC, BATS, INDEX
+
+#     Returns:
+#         dict: A message indicating the operation is done.
+#     """
+#     try:
+#         mappingApi = MappingApi(api_key=SEC_API_KEY)
+#         by_exchange = mappingApi.resolve('exchange', exchange)
+#         all_listings = pd.DataFrame(by_exchange)
+#         all_listings.to_csv("f{exchange}.csv", index=False)
+#         return {"message": "done"}
+#     except Exception as e:
+#         return {"error": str(e)}
+
+@app.post("/ExchangeMarket/v1/Companies", status_code=status.HTTP_200_OK, tags=[Tags.exchange])
+def create_companies(db: Session = Depends(get_db)):
+    """
+    Updates the database with exchange data from CSV files.
 
     Returns:
-        dict: A message indicating the operation is done.
+        dict: A dictionary containing a message indicating that the operation has been completed.
     """
-    try:
-        mappingApi = MappingApi(api_key=SEC_API_KEY)
-        by_exchange = mappingApi.resolve('exchange', exchange)
-        all_listings = pd.DataFrame(by_exchange)
-        all_listings.to_csv("f{exchange}.csv", index=False)
-        return {"message": "done"}
-    except Exception as e:
-        return {"error": str(e)}
 
-@app.post("/Exchange/v1/Companies", status_code=status.HTTP_200_OK, tags=[Tags.exchange])
-def create_companies(db: Session = Depends(get_db)):
     exchanges = [
         "bats",
         "index",
@@ -119,8 +135,22 @@ def create_companies(db: Session = Depends(get_db)):
 
     return {"message": "done"}
 
-@app.get("/Exchange/v1/Companies/{exchange}", tags=[Tags.exchange])
+@app.get("/ExchangeMarket/v1/Companies/{exchange}", tags=[Tags.exchange])
 def read_companies(exchange: str, page: int = 1, limit: int = 100, db: Session = Depends(get_db)):
+    """
+    Fetches companies listed on a specified exchange market.
+
+    Args:
+
+    exchange (str): The exchange for which the companies are listed.
+            Must be one of: NYSE, NASDAQ, NYSEMKT, NYSEARCA, OTC, BATS, INDEX.
+
+    page (int): The page number of results to retrieve. Default is 1.
+
+    Returns:
+        dict: A dictionary containing information about 100 companies from the selected exchange market.
+    """
+
     db_companies = utils.get_companies(db, exchange=exchange, page=page, limit=limit)
     if not db_companies:
         raise HTTPException(status_code=404, detail="No companies found for the specified exchange.")
