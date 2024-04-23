@@ -20,7 +20,7 @@ import utils
 import schemas
 
 load_dotenv()
-API_KEY=os.environ.get("STOCK_DATA_API_KEY")
+API_KEY=os.environ.get("API_KEY")
 SEC_API_KEY=os.environ.get("SEC_API_KEY")
 
 # Dependency
