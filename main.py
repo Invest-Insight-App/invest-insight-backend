@@ -1,19 +1,33 @@
 import datetime
 from typing import List
-from fastapi import FastAPI
+import pandas as pd
 from pydantic import BaseModel
 from transformers import pipeline
 import requests
 import os
 from dotenv import load_dotenv
-from data import DUMMY_DATA
-from fastapi import FastAPI, HTTPException, status, Request
+from fastapi import FastAPI, HTTPException, status, Request, Depends
 import time
 from fastapi.middleware.cors import CORSMiddleware
 from enum import Enum
+from sec_api import MappingApi
+
+from sqlalchemy.orm import Session
+from database import SessionLocal, engine
+import utils
+import schemas
 
 load_dotenv()
 API_KEY=os.environ.get("NEWS_API_KEY")
+SEC_API_KEY=os.environ.get("SEC_API_KEY")
+
+# Dependency
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 app = FastAPI(debug=True, title="Investment Insight API")
 
@@ -32,39 +46,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"])
 
-class Payload(BaseModel):
-    text: str
-
-# Define the Pydantic model for sentiment analysis response
-class SentimentAnalysisScores(BaseModel):
-    label: str
-    score: float
-
-class ArticleResponses(BaseModel):
-    article_sentiment_analysis: List[SentimentAnalysisScores]
-    article_name: str
-    article_description: str
-    article_url: str
-
-class SentimentAnalysisResponses(BaseModel):
-    responses: List[ArticleResponses]
-
 class Tags(Enum):
     investmentInsight = "Investment Analysis"
+    exchange = "Companies data"
 
-async def classify_text(articles):
-    pipe = pipeline("text-classification", model="mrm8488/distilroberta-finetuned-financial-news-sentiment-analysis")
-    results = []
-    for article in articles:
-        print("article", article['title'])
-        if article['title'] != '[Removed]':
-            results.append({"article_sentiment_analysis": pipe(article['title']), "article_name": article['title'], "article_description": article['description'], "article_url": article['url']})
-    return results;
-
-@app.get("/investmentAnalysis/v1/sentimentAnalysis", response_model=SentimentAnalysisResponses, status_code=status.HTTP_200_OK, tags=[Tags.investmentInsight], summary="sentiment analysis on news articles")
+@app.get("/investmentAnalysis/v1/sentimentAnalysis", response_model=schemas.SentimentAnalysisResponses, status_code=status.HTTP_200_OK, tags=[Tags.investmentInsight], summary="sentiment analysis on news articles")
 async def classify(company_name: str, start_date: datetime.date):
     api_key = API_KEY
-    print("api_key", api_key)
 
     if api_key:
         api_key = api_key.strip("()").strip("' ")
@@ -81,7 +69,88 @@ async def classify(company_name: str, start_date: datetime.date):
         raise HTTPException(status_code=articles.status_code, detail="Failed to fetch news articles")
 
     responses = articles.json()[ 'articles']
-    results = await classify_text(responses)
+    results = await utils.classify_text(responses)
     return {"responses": results, "totalResults": len(results), "status": "ok"}
 
+@app.get("/InvestmentAnalysis/v2/SentimentAnalysis", response_model=schemas.SentimentAnalysisResponses, status_code=status.HTTP_200_OK, tags=[Tags.investmentInsight], summary="Sentiment Analysis On News Articles")
+async def classify(company_name: str, start_date: datetime.date):
+    """
+    Create CSV files for listed companies.
 
+    Args:
+        exchange (str): The exchange for which the companies are listed.
+            Must be one of: NYSE, NASDAQ, NYSEMKT, NYSEARCA, OTC, BATS, INDEX
+
+    Returns:
+        dict: A message indicating the operation is done.
+    """
+    api_key = API_KEY
+
+    if api_key:
+        api_key = api_key.strip("()").strip("' ")
+    else:
+        raise HTTPException(status_code=404, detail="Internal server error")
+
+    try:
+        # articles = DUMMY_DATA["data"]["articles"]
+        articles = requests.get(f'https://newsapi.org/v2/everything?q={company_name}&from={start_date}&sortBy=popularity&apiKey={api_key}')
+    except Exception as e:
+        raise HTTPException(status_code=articles.status_code) from e
+
+    if articles.status_code != 200:
+        raise HTTPException(status_code=articles.status_code, detail="Failed to fetch news articles")
+
+    responses = articles.json()[ 'articles']
+    results = await utils.classify_text(responses)
+    return {"responses": results, "totalResults": len(results), "status": "ok"}
+
+@app.post("/Exchange/v1/CompaniesCsv", response_model=[], status_code=status.HTTP_200_OK, tags=[Tags.exchange])
+async def create_csv_files_for_listed_companies(exchange: str):
+    """
+    Create CSV files for listed companies.
+
+    Args:
+        exchange (str): The exchange for which the companies are listed.
+            Must be one of: NYSE, NASDAQ, NYSEMKT, NYSEARCA, OTC, BATS, INDEX
+
+    Returns:
+        dict: A message indicating the operation is done.
+    """
+    try:
+        mappingApi = MappingApi(api_key=SEC_API_KEY)
+        by_exchange = mappingApi.resolve('exchange', exchange)
+        all_listings = pd.DataFrame(by_exchange)
+        all_listings.to_csv("f{exchange}.csv", index=False)
+        return {"message": "done"}
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/Exchange/v1/Companies", status_code=status.HTTP_200_OK, tags=[Tags.exchange])
+def create_companies(db: Session = Depends(get_db)):
+    exchanges = [
+        "bats",
+        "index",
+        "nasdaq",
+        "nyse",
+        "nysearca",
+        "nysemkt",
+        "otc"
+    ]
+
+    for exchange in exchanges:
+        df_bats = pd.read_csv(f"./exchange_data/{exchange}.csv")
+        for _, row in df_bats.iterrows():
+            row = row.fillna('')
+            try:
+                utils.create_mutiple_company_from_schema(row, db=db)
+            except Exception as e:
+                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to process data") from e
+
+    return {"message": "done"}
+
+@app.get("/Exchange/v1/Companies/{exchange}", tags=[Tags.exchange])
+def read_companies(exchange: str, page: int = 1, limit: int = 100, db: Session = Depends(get_db)):
+    db_companies = utils.get_companies(db, exchange=exchange, page=page, limit=limit)
+    if not db_companies:
+        raise HTTPException(status_code=404, detail="No companies found for the specified exchange.")
+    return db_companies
